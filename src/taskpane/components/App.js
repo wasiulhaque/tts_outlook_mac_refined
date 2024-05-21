@@ -25,6 +25,8 @@ import StopOutlinedIcon from "@mui/icons-material/StopOutlined";
 import { BorderAll } from "@mui/icons-material";
 import { fileToAudioBuffer, mergeAudioBuffers } from "./../../modules/chunkify";
 import { async } from "regenerator-runtime";
+import io from "socket.io-client";
+import Crunker from "crunker";
 
 const containerStyle = {
   backgroundColor: "white",
@@ -118,7 +120,7 @@ export default class App extends React.Component {
       listItems: [],
       type: null,
       format: "unicode",
-      gender: "Male",
+      gender: "male",
       age: null,
       speed: 0,
       pitch: 0,
@@ -129,13 +131,60 @@ export default class App extends React.Component {
       currentlyPlaying: false,
       startedPlaying: false,
       globalText: null,
+      isSocketConnected: false,
     };
   }
+
+  initializeSocket = () => {
+    this.socket = io("https://dev.revesoft.com:9395", { transports: ["websocket"] });
+    this.socket.on("connect", () => {
+      console.log("Connected to the server");
+      this.setState({ isSocketConnected: true });
+    });
+    this.socket.on("disconnect", () => {
+      console.log("Disconnected from the server");
+      this.setState({ isSocketConnected: false });
+    });
+    this.socket.on("result", (data) => {
+      const {index, audio} = data;
+      console.log(`Received response for ${index}`);
+      
+      if (audio){
+        responseBuffers[index] = audio;
+        const audioSrc = `data:audio/wav;base64,${audio}`;
+        const audioElement = new Audio(audioSrc);
+        console.log(`Created audio blob players for ${index}`);
+        responseAudios[index] = audioElement;
+
+        if (index == 0) {
+          this.setState({ currentlyPlaying: true, downloadActivate: false });
+          this.triggerPlayback();
+        }
+      } else{
+        console.log("Error: No audio data received for index", index);
+      }
+    });
+  }
+
+  base64ToBlob = (base64Data) => {
+    console.log("Converting base64 to blob");
+    const binaryString = window.atob(base64Data);
+    const byteArray = new Uint8Array(binaryString.length);
+
+    for (let i = 0; i < binaryString.length; i++) {
+      byteArray[i] = binaryString.charCodeAt(i);
+    }
+    console.log("Conversion done");
+    return new Blob([byteArray], { type: "audio/mp3" });
+  };
 
   componentDidMount() {
     this.setState({
       listItems: [],
     });
+    if (this.state.isSocketConnected == false) {
+      this.initializeSocket();
+    }
   }
 
   /**
@@ -227,16 +276,38 @@ export default class App extends React.Component {
   };
 
   handleDownload = async () => {
-    let audioBufferList = [];
-    responseBuffers.forEach(async (responseBuffer) => {
-      let audioBuffer = await fileToAudioBuffer(responseBuffer);
-      audioBufferList.push(audioBuffer);
-      console.log(`Buffer here: ${audioBuffer}}`);
-      console.log("HJ");
-    });
-    console.log("Hello");
+    console.log("Download button clicked");
+    let audioBuffers = [];
+    for (let i = 0; i < Object.keys(responseBuffers).length; i++) {
+      audioBuffers.push(this.base64ToBlob(responseBuffers[i]));
+    }
+    console.log("Audio buffers collected");
+    console.log(audioBuffers);
+    const crunker = new Crunker({ sampleRate: 22050 });
+    crunker
+      .fetchAudio(...audioBuffers)
+      .then((buffers) => {
+        console.log("Audio buffers fetched");
+        return crunker.concatAudio(buffers);
+      })
+      .then((merged) => {
+        console.log("Audio buffers merged");
+        return crunker.export(merged, "audio/mp3");
+      })
+      .then((output) => {
+        crunker.download(
+          output.blob,
+          `tts_audio`
+        );
+        // document.body.append(output.element);
+      })
+      .catch((error) => {
+        console.log("in errror", error);
+      });
 
-    mergeAudioBuffers(audioBufferList);
+    crunker.notSupported(() => {
+      // Handle no browser support
+    });
   };
 
   /**
@@ -372,70 +443,25 @@ export default class App extends React.Component {
         console.log("Max word count reached");
         const wordChunks = this.splitLongWords(words, MAX_WORD_COUNT);
         for (const wordChunk of wordChunks) {
-          const requestOptions = {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({
-              module: "backend_tts",
-              submodule: "infer",
-              text: wordChunk,
-            }),
-          };
-          try {
-            const audioBlob = await fetch("https://stt.bangla.gov.bd:9381/utils/", requestOptions).then((response) =>
-              response.blob()
-            );
-
-            if (audioBlob) {
-              const blobURL = URL.createObjectURL(await audioBlob);
-              const audioElement = new Audio(await blobURL);
-              responseAudios[chunk_index + index] = audioElement;
-              console.log(`Received response for ${chunk_index + index}`);
-              if (index + chunk_index == 0) {
-                this.setState({ currentlyPlaying: true, downloadActivate: false });
-                this.triggerPlayback();
-              }
-            } else {
-              console.log("Error: No audio data received");
-            }
-          } catch (error) {
-            console.error("Error: ", error);
-          }
+          const chunkIndex = index;
+          this.socket.emit("text_transmit", {
+            text: wordChunk,
+            model: "vits",
+            gender: this.state.gender,
+            index: chunkIndex,
+            speaker: this.state.gender=="male"?"2":"0"
+          })
           index = index + 1;
         }
       } else {
-        const requestOptions = {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            module: "backend_tts",
-            submodule: "infer",
+          console.log("Sending chunk to server: ", index + chunk_index, chunk);
+          this.socket.emit("text_transmit", {
             text: chunk,
-          }),
-        };
-        try {
-          const audioBlob = await fetch("https://stt.bangla.gov.bd:9381/utils/", requestOptions).then((response) =>
-            response.blob()
-          );
-
-          if (audioBlob) {
-            const blobURL = URL.createObjectURL(await audioBlob);
-            const audioElement = new Audio(await blobURL);
-            responseBuffers.push(await audioBlob);
-            console.log(responseBuffers.length);
-            console.log("Buffer");
-            responseAudios[chunk_index + index] = audioElement;
-            console.log(`Received response for ${chunk_index + index}`);
-            if (index + chunk_index == 0) {
-              this.setState({ currentlyPlaying: true, downloadActivate: false });
-              this.triggerPlayback();
-            }
-          } else {
-            console.log("Error: No audio data received");
-          }
-        } catch (error) {
-          console.error("Error: ", error);
-        }
+            model: "vits",
+            gender: this.state.gender,
+            index: index + chunk_index,
+            speaker: this.state.gender=="male"?"2":"0"
+          })
       }
     }
   };
@@ -524,13 +550,13 @@ export default class App extends React.Component {
               <div className="button-container">
                 <ToggleButtonGroup value={gender} exclusive onChange={this.handleGenderChange}>
                   <ToggleButton
-                    value="Male"
+                    value="male"
                     aria-label="পুরুষ"
                     className="ms-welcome__action ms-button-uniform"
                     style={{
                       height: "40px",
-                      color: gender === "Male" ? "white" : "black",
-                      backgroundColor: gender === "Male" ? "#006def" : "inherit",
+                      color: gender === "male" ? "white" : "black",
+                      backgroundColor: gender === "male" ? "#006def" : "inherit",
                       borderTopLeftRadius: "8px",
                       borderBottomLeftRadius: "8px",
                       width: "80px",
@@ -539,13 +565,13 @@ export default class App extends React.Component {
                     পুরুষ
                   </ToggleButton>
                   <ToggleButton
-                    value="Female"
+                    value="female"
                     aria-label="নারী"
                     className="ms-welcome__action ms-button-uniform"
                     style={{
                       height: "40px",
-                      color: gender === "Female" ? "white" : "black",
-                      backgroundColor: gender == "Female" ? "#006def" : "inherit",
+                      color: gender === "female" ? "white" : "black",
+                      backgroundColor: gender == "female" ? "#006def" : "inherit",
                       borderTopRightRadius: "8px",
                       borderBottomRightRadius: "8px",
                       width: "80px",
@@ -558,8 +584,8 @@ export default class App extends React.Component {
             </div>
             {/* <div className="button-container">
           <RadioGroup row aria-labelledby="radio-buttons-group-gender-label" name="radio-buttons-group-gender">
-            <FormControlLabel value="Male" control={<Radio />} label="পুরুষ" onChange={this.handleGenderChange} />
-            <FormControlLabel value="Female" control={<Radio />} label="নারী" onChange={this.handleGenderChange} />
+            <FormControlLabel value="male" control={<Radio />} label="পুরুষ" onChange={this.handleGenderChange} />
+            <FormControlLabel value="female" control={<Radio />} label="নারী" onChange={this.handleGenderChange} />
           </RadioGroup>
         </div>
 
@@ -589,7 +615,7 @@ export default class App extends React.Component {
               />
             </Box>
           </div> */}
-
+{/*
             <div style={{ display: "flex" }}>
               <div style={{ display: "flex", alignItems: "center", marginRight: "10px" }}>
                 <Typography id="speed-slider">গতি</Typography>

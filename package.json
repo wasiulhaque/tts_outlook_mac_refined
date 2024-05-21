@@ -33,11 +33,13 @@
     "@mui/material": "^5.13.6",
     "bn-ansi-to-unicode": "^1.0.1",
     "core-js": "^3.9.1",
+    "crunker": "^2.4.0",
     "es6-promise": "^4.2.8",
     "react": "^17.0.2",
     "react-audio-player": "^0.17.0",
     "react-dom": "^17.0.2",
-    "regenerator-runtime": "^0.13.7"
+    "regenerator-runtime": "^0.13.7",
+    "socket.io-client": "^4.7.5"
   },
   "devDependencies": {
     "@babel/core": "^7.13.10",
