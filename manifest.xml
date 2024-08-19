@@ -79,8 +79,8 @@
         <bt:Url id="Taskpane.Url" DefaultValue="https://localhost:3000/taskpane.html"/>
       </bt:Urls>
       <bt:ShortStrings>
-        <bt:String id="GroupLabel" DefaultValue="উচ্চারণ MacOS"/>
-        <bt:String id="TaskpaneButton.Label" DefaultValue="উচ্চারণ MacOS"/>
+        <bt:String id="GroupLabel" DefaultValue="উচ্চারণ"/>
+        <bt:String id="TaskpaneButton.Label" DefaultValue="উচ্চারণ"/>
       </bt:ShortStrings>
       <bt:LongStrings>
         <bt:String id="TaskpaneButton.Tooltip" DefaultValue="Opens a pane displaying all available properties."/>
