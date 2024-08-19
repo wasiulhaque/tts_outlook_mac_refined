@@ -508,6 +508,7 @@ export default class App extends React.Component {
         </div> */}
 
             {/* <div className="square">
+            {/* <div className="square">
               <div className="caption">অক্ষরসেট</div>
               <div className="button-container">
                 <ToggleButtonGroup value={format} exclusive onChange={this.handleFormatButton}>
@@ -543,6 +544,7 @@ export default class App extends React.Component {
                   </ToggleButton>
                 </ToggleButtonGroup>
               </div>
+            </div> */}
             </div> */}
 
             <div className="square" style={{ marginTop: "30px", marginBottom: "20px" }}>
@@ -698,6 +700,7 @@ export default class App extends React.Component {
                 </Button>
               </div>
               {/* <Button
+              {/* <Button
                 variant="contained"
                 size="small"
                 onClick={this.handleDownload}
@@ -706,6 +709,7 @@ export default class App extends React.Component {
                 disabled={!downloadActivate}
               >
                 <FileDownloadOutlinedIcon />
+              </Button> */}
               </Button> */}
             </div>
           </div>
