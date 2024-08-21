@@ -72,7 +72,7 @@ const theme = createTheme({
   },
 });
 
-let MAX_WORD_COUNT = 20;
+let MAX_WORD_COUNT = 1000;
 let MAX_TIMEOUT_RETRY = 5;
 let responseAudios = {};
 let responseBuffers = [];
@@ -545,7 +545,6 @@ export default class App extends React.Component {
                 </ToggleButtonGroup>
               </div>
             </div> */}
-            </div> */}
 
             <div className="square" style={{ marginTop: "30px", marginBottom: "20px" }}>
               <div className="caption">কন্ঠ</div>
@@ -709,7 +708,6 @@ export default class App extends React.Component {
                 disabled={!downloadActivate}
               >
                 <FileDownloadOutlinedIcon />
-              </Button> */}
               </Button> */}
             </div>
           </div>
